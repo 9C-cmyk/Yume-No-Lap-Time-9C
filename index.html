@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>YUME NO LAP TIME - Reading 9C</title>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+
+<style>
+body {
+  margin:0; padding:0;
+  font-family: 'Arial', sans-serif;
+  background: linear-gradient(135deg, #ff0000, #000000);
+  color:white;
+  overflow-x:hidden;
+}
+.container {max-width:900px; margin:auto; padding:20px;}
+h1,h2,h3 {font-family:'Arial Black', sans-serif; font-style:italic;}
+button {padding:8px 15px; margin:5px; background: yellow; border:none; border-radius:5px; cursor:pointer; font-weight:bold; font-style:italic;}
+button:hover{background:orange;}
+input, select {padding:8px; margin:5px; border-radius:5px; border:none; width:90%;}
+section {margin-bottom:20px; padding:15px; background: rgba(0,0,0,0.6); border-radius:10px;}
+#chat-box {height:200px; overflow-y:scroll; border:1px solid white; padding:10px; background:#111;}
+header {display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; background:#222; padding:10px; border-radius:10px;}
+header h1{color:yellow;}
+.activity-btn {background:#ffcc00; color:#000; font-weight:bold; margin:5px;}
+.activity-btn:hover{background:#ff9900; color:#fff;}
+
+/* Opening F1 */
+#opening {position:fixed; top:0; left:0; width:100%; height:100%; background:black; display:flex; justify-content:center; align-items:center; flex-direction:column; color:#ffcc00; font-size:3em; z-index:999;}
+#opening span {opacity:0; animation:fadeInOut 1s forwards;}
+@keyframes fadeInOut {0%{opacity:0;}50%{opacity:1;}100%{opacity:0;}}
+</style>
+</head>
+<body>
+
+<!-- Opening ala F1 -->
+<div id="opening">
+  <span id="ready">READY</span>
+  <span id="set" style="display:none;">SET</span>
+  <span id="go" style="display:none;">GO!</span>
+</div>
+
+<!-- LOGIN PAGE -->
+<div class="container" id="login-page" style="display:none;">
+  <h1>YUME NO LAP TIME - Login Reading 9C</h1>
+  <input type="email" id="email" placeholder="Email">
+  <input type="password" id="password" placeholder="Password">
+  <select id="role">
+    <option value="anggota">Anggota</option>
+    <option value="admin">Admin</option>
+  </select>
+  <button onclick="login()">Login</button>
+  <p id="login-msg"></p>
+</div>
+
+<!-- DASHBOARD ANGGOTA -->
+<div class="container" id="dashboard-page" style="display:none;">
+  <header>
+    <h1>Dashboard - Reading 9C</h1>
+    <button onclick="logout()">Logout</button>
+  </header>
+
+  <section class="profile">
+    <h2>Profil Kamu</h2>
+    <img src="https://via.placeholder.com/100" alt="Avatar" id="avatar" width="100">
+    <input type="file" onchange="changeAvatar(event)">
+    <p>Email: <span id="profile-name"></span></p>
+    <input type="password" placeholder="Ganti Password" id="new-password">
+    <button onclick="updateProfile()">Update Profil</button>
+  </section>
+
+  <section class="activities">
+    <h2>Aktivitas Literasi</h2>
+    <button class="activity-btn" onclick="lapMembaca()">Lap Membaca</button>
+    <button class="activity-btn" onclick="pitStop()">Pit Stop Inspirasi</button>
+    <button class="activity-btn" onclick="readingRaceWeek()">Reading Race Week</button>
+    <button class="activity-btn" onclick="finishLine()">Finish Line of Dreams</button>
+  </section>
+
+  <section class="chat">
+    <h2>Reading 9C Chat</h2>
+    <div id="chat-box"></div>
+    <input type="text" id="chat-msg" placeholder="Ketik pesan...">
+    <button onclick="sendMessage()">Kirim</button>
+  </section>
+</div>
+
+<!-- ADMIN PAGE -->
+<div class="container" id="admin-page" style="display:none;">
+  <header>
+    <h1>Admin Panel - Reading 9C</h1>
+    <button onclick="logout()">Logout</button>
+  </header>
+
+  <section>
+    <h2>Kelola Buku</h2>
+    <input type="text" id="new-book" placeholder="Judul buku baru">
+    <button onclick="addBook()">Tambah Buku</button>
+    <ul id="books-list"></ul>
+  </section>
+
+  <section>
+    <h2>Kelola Anggota</h2>
+    <input type="email" id="new-member-email" placeholder="Email anggota">
+    <input type="password" id="new-member-pw" placeholder="Password anggota">
+    <button onclick="addMember()">Tambah Anggota</button>
+    <ul id="members-list"></ul>
+  </section>
+</div>
+
+<script>
+// ===== Firebase Config =====
+// Ganti dengan konfigurasi Firebase milikmu
+const firebaseConfig = {
+  apiKey: "API_KEY",
+  authDomain: "PROJECT_ID.firebaseapp.com",
+  projectId: "PROJECT_ID",
+  storageBucket: "PROJECT_ID.appspot.com",
+  messagingSenderId: "SENDER_ID",
+  appId: "APP_ID"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+// ===== Opening F1 Animation =====
+window.onload = () => {
+  const ready = document.getElementById('ready');
+  const set = document.getElementById('set');
+  const go = document.getElementById('go');
+  setTimeout(()=>{ready.style.display='none'; set.style.display='block';}, 1000);
+  setTimeout(()=>{set.style.display='none'; go.style.display='block';}, 2000);
+  setTimeout(()=>{document.getElementById('opening').style.display='none'; document.getElementById('login-page').style.display='block';}, 3000);
+}
+
+// ===== LOGIN =====
+function login(){
+  const email = document.getElementById('email').value;
+  const password = document.getElementById('password').value;
+  const role = document.getElementById('role').value;
+
+  auth.signInWithEmailAndPassword(email,password)
+    .then(userCredential => {
+      const uid = userCredential.user.uid;
+      db.collection('users').doc(uid).get().then(doc=>{
+        if(doc.exists && doc.data().role===role){
+          sessionStorage.setItem('currentUser', JSON.stringify({uid, role}));
+          document.getElementById('login-page').style.display='none';
+          if(role==='admin') showAdminPage();
+          else showDashboard();
+        } else {
+          alert("Role tidak sesuai!");
+          auth.signOut();
+        }
+      });
+    })
+    .catch(error=>document.getElementById('login-msg').innerText=error.message);
+}
+
+// ===== LOGOUT =====
+function logout(){
+  auth.signOut();
+  sessionStorage.removeItem('currentUser');
+  document.getElementById('login-page').style.display='block';
+  document.getElementById('dashboard-page').style.display='none';
+  document.getElementById('admin-page').style.display='none';
+}
+
+// ===== DASHBOARD =====
+function showDashboard(){
+  document.getElementById('dashboard-page').style.display='block';
+  const user = JSON.parse(sessionStorage.getItem('currentUser'));
+  const profile = document.getElementById('profile-name');
+  auth.onAuthStateChanged(u=>{if(u) profile.innerText = u.email;});
+
+  // Load chat
+  db.collection('chat').orderBy('time').onSnapshot(snapshot=>{
+    const chatBox = document.getElementById('chat-box');
+    chatBox.innerHTML='';
+    snapshot.forEach(doc=>{
+      const p=document.createElement('p');
+      p.textContent=doc.data().user+": "+doc.data().msg;
+      chatBox.appendChild(p);
+    });
+    chatBox.scrollTop = chatBox.scrollHeight;
+  });
+}
+
+// ===== ADMIN PAGE =====
+function showAdminPage(){
+  document.getElementById('admin-page').style.display='block';
+  renderBooks();
+  renderMembers();
+}
+
+// ===== PROFIL =====
+function changeAvatar(event){
+  const avatar = document.getElementById('avatar');
+  avatar.src = URL.createObjectURL(event.target.files[0]);
+}
+function updateProfile(){
+  const pw = document.getElementById('new-password').value;
+  const user = auth.currentUser;
+  if(pw){
+    user.updatePassword(pw).then(()=>alert("Password berhasil diupdate")).catch(e=>alert(e.message));
+  }
+}
+
+// ===== ACTIVITAS =====
+function lapMembaca(){ alert("Fitur Lap Membaca (implementasi Firestore nanti)"); }
+function pitStop(){ alert("Fitur Pit Stop Inspirasi (implementasi Firestore nanti)"); }
+function readingRaceWeek(){ alert("Fitur Reading Race Week (implementasi Firestore nanti)"); }
+function finishLine(){ alert("Fitur Finish Line of Dreams (implementasi Firestore nanti)"); }
+
+// ===== CHAT =====
+function sendMessage(){
+  const msgInput = document.getElementById('chat-msg');
+  if(msgInput.value.trim()!==""){
+    const user = auth.currentUser;
+    db.collection('chat').add({user:user.email, msg: msgInput.value, time: firebase.firestore.FieldValue.serverTimestamp()});
+    msgInput.value="";
+  }
+}
+
+// ===== ADMIN FUNGSI =====
+function addBook(){
+  const title = document.getElementById('new-book').value.trim();
+  if(title===""){ alert("Masukkan judul buku!"); return; }
+  db.collection('books').add({title});
+  document.getElementById('new-book').value="";
+  renderBooks();
+}
+function renderBooks(){
+  const list = document.getElementById('books-list');
+  list.innerHTML="";
+  db.collection('books').get().then(snapshot=>{
+    snapshot.forEach(doc=>{
+      const li=document.createElement('li');
+      li.textContent=doc.data().title;
+      list.appendChild(li);
+    });
+  });
+}
+
+function addMember(){
+  const email = document.getElementById('new-member-email').value.trim();
+  const pw = document.getElementById('new-member-pw').value.trim();
+  if(email==="" || pw===""){ alert("Masukkan email & password anggota!"); return; }
+  auth.createUserWithEmailAndPassword(email,pw)
+    .then(userCredential=>{
+      db.collection('users').doc(userCredential.user.uid).set({role:'anggota'});
+      document.getElementById('new-member-email').value="";
+      document.getElementById('new-member-pw').value="";
+      renderMembers();
+    })
+    .catch(e=>alert(e.message));
+}
+function renderMembers(){
+  const list = document.getElementById('members-list');
+  list.innerHTML="";
+  db.collection('users').get().then(snapshot=>{
+    snapshot.forEach(doc=>{
+      list.appendChild(document.createElement('li')).textContent = doc.data().role+" - "+(doc.data().email||"Email tidak ditampilkan");
+    });
+  });
+}
+</script>
+</body>
+</html>
